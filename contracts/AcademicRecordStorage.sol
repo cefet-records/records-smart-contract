@@ -15,24 +15,30 @@ contract AcademicRecordStorage is Ownable {
   }
   mapping(bytes32 => Record) public records;
   mapping(bytes32 => mapping(address => bytes)) public visitorAccessKeys;
+  
   event RecordRegistered(
     bytes32 indexed recordId,
     address indexed studentAddress,
     address indexed institutionAddress,
     uint256 timestamp
   );
+
   event AccessGranted(
     bytes32 indexed recordId,
     address indexed studentAddress,
     address indexed visitorAddress
   );
+
   event AccessRevoked(
     bytes32 indexed recordId,
     address indexed studentAddress,
     address indexed visitorAddress
   );
+
   mapping(address => bool) public isInstitution;
+
   constructor() Ownable(msg.sender) {} 
+
   modifier onlyInstitution() {
     require(isInstitution[msg.sender], "Caller is not an autorized institution");
     _;
@@ -90,11 +96,8 @@ contract AcademicRecordStorage is Ownable {
       );
     }
   }
-  function grantVisitorAccess(
-    bytes32 _recordId,
-    address _visitorAddress,
-    bytes calldata _encryptedKeyVisitor
-  ) public {
+
+  function grantVisitorAccess(bytes32 _recordId, address _visitorAddress, bytes calldata _encryptedKeyVisitor) public {
     require(records[_recordId].studentAddress == msg.sender, "Caller is not the student owner of this record");
     require(_visitorAddress != address(0), "Visitor address cannot be zero");
     require(_encryptedKeyVisitor.length > 0, "Encrypted key for visitor cannot be empty");
