@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
+
 import "@openzeppelin/contracts/access/Ownable.sol"; 
 
 contract AcademicRecordStorage is Ownable {
@@ -59,16 +60,14 @@ contract AcademicRecordStorage is Ownable {
     bytes[] calldata _encryptedData,
     bytes[] calldata _encryptedKeyInstitution,
     bytes[] calldata _encryptedKeyStudent,
-    bytes[] calldata _signaturesInstitution,
-    string[] calldata _policies
+    bytes[] calldata _signaturesInstitution
   ) external onlyInstitution {
     require(
       _recordIds.length == _studentAddresses.length &&
       _recordIds.length == _encryptedData.length &&
       _recordIds.length == _encryptedKeyInstitution.length &&
       _recordIds.length == _encryptedKeyStudent.length &&
-      _recordIds.length == _signaturesInstitution.length &&
-      _recordIds.length == _policies.length,
+      _recordIds.length == _signaturesInstitution.length,
       "Array lengths mismatch"
     );
     require(_recordIds.length > 0, "No records to register");
@@ -86,7 +85,6 @@ contract AcademicRecordStorage is Ownable {
         encryptedKeyStudent: _encryptedKeyStudent[i],
         signatureInstitution: _signaturesInstitution[i],
         timestamp: block.timestamp
-        // policy: _policies[i] // Armazenando policy
       });
       emit RecordRegistered(
         currentRecordId,
