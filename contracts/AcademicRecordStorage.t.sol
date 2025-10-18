@@ -1,9 +1,0 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
-
-import {AcademicRecordStorage} from "./AcademicRecordStorage.sol";
-import {Test} from "forge-std/Test.sol";
-
-contract AcademicRecordStorageTest is Test {
-  
-}
