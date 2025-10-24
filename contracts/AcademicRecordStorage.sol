@@ -40,6 +40,9 @@ contract AcademicRecordStorage is Ownable {
 
   constructor() Ownable(msg.sender) {} 
 
+  receive() external payable {}
+  fallback() external payable {}
+
   modifier onlyInstitution() {
     require(isInstitution[msg.sender], "Caller is not an autorized institution");
     _;
@@ -60,28 +63,31 @@ contract AcademicRecordStorage is Ownable {
     bytes[] calldata _encryptedData, bytes[] calldata _encryptedKeyInstitution, 
     bytes[] calldata _encryptedKeyStudent, bytes[] calldata _signatures
   ) external onlyInstitution {
-    require(
-      _recordIds.length == _studentes.length && 
-      _recordIds.length == _encryptedData.length &&
-      _recordIds.length == _encryptedKeyInstitution.length && 
-      _recordIds.length == _encryptedKeyStudent.length &&
-      _recordIds.length == _signatures.length, "Array lengths mismatch"
-    );
-    require(_recordIds.length > 0, "No records to register");
+    uint256 len = _recordIds.length;
+      
+    require(len > 0, "No records to register");
+    require(len == _studentes.length, "Student address array length mismatch");
+    require(len == _encryptedData.length, "Encrypted data array length mismatch");
+    require(len == _encryptedKeyInstitution.length, "Issuer key array length mismatch");
+    require(len == _encryptedKeyStudent.length, "Student key array length mismatch");
+    require(len == _signatures.length, "Signature array length mismatch");
 
-    for (uint i = 0; i < _recordIds.length; i++) {
+    for (uint i = 0; i < len; i++) {
       bytes32 currentRecordId = _recordIds[i];
-      address currentstudent = _studentes[i];
+      address currentStudent = _studentes[i];
+          
       require(records[currentRecordId].student == address(0), "Record ID already exists");
-      require(currentstudent != address(0), "Student address cannot be zero");
+      require(currentStudent != address(0), "Student address cannot be zero");
 
       records[currentRecordId] = Record({
-        recordId: currentRecordId, student: currentstudent, institution: msg.sender, 
-        encryptedData: _encryptedData[i], encryptedKeyInstitution: _encryptedKeyInstitution[i],
-        encryptedKeyStudent: _encryptedKeyStudent[i], signature: _signatures[i], 
-        timestamp: block.timestamp
+        recordId: currentRecordId, student: currentStudent, 
+        institution: msg.sender, encryptedData: _encryptedData[i], 
+        encryptedKeyInstitution: _encryptedKeyInstitution[i],
+        encryptedKeyStudent: _encryptedKeyStudent[i], 
+        signature: _signatures[i], timestamp: block.timestamp
       });
-      emit RecordRegistered(currentRecordId, currentstudent, msg.sender, block.timestamp);
+          
+      emit RecordRegistered(currentRecordId, currentStudent, msg.sender, block.timestamp);
     }
   }
 
