@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-contract AcademicRegistry {
+contract AcademicRecordStorage {
     event InstitutionAdded(address indexed institutionAddress, string name);
     event CourseAdded(address indexed institutionAddress, string courseCode);
     event DisciplineAdded(string courseCode, string disciplineCode);
@@ -53,6 +53,17 @@ contract AcademicRegistry {
     }
 
     struct Grade {
+        string disciplineCode;
+        uint8 semester;
+        uint16 year;
+        uint8 grade;
+        uint8 attendance;
+        bool status;
+    }
+
+    struct BatchGradePayload {
+        address studentAddress;
+        string courseCode;
         string disciplineCode;
         uint8 semester;
         uint16 year;
@@ -223,40 +234,46 @@ contract AcademicRegistry {
     }
 
     function addDisciplineToCourse(
-        address _institutionAddress,
-        string calldata _courseCode,
-        string calldata _disciplineCode,
-        string calldata _name,
-        string calldata _syllabus,
-        int _workload,
-        int _creditCount
-    )
-        public
-        institutionExists(_institutionAddress)
-        courseExists(_institutionAddress, _courseCode)
-        onlyInstitution
-    {
-        require(
-            msg.sender == _institutionAddress,
-            "Only the specified institution can add disciplines to its courses."
+        address institutionAddress,
+        string calldata courseCode,
+        string calldata disciplineCode,
+        string calldata name,
+        string calldata syllabus,
+        int workload,
+        int creditCount
+    ) public courseExists(institutionAddress, courseCode) onlyInstitution {
+        _addDisciplineToCourse(
+            courseCode,
+            disciplineCode,
+            name,
+            syllabus,
+            workload,
+            creditCount
         );
-        bytes32 courseHash = keccak256(abi.encodePacked(_courseCode));
-        bytes32 disciplineHash = keccak256(abi.encodePacked(_disciplineCode));
+    }
+
+    function _addDisciplineToCourse(
+        string calldata courseCode,
+        string calldata disciplineCode,
+        string calldata name,
+        string calldata syllabus,
+        int workload,
+        int creditCount
+    ) internal {
+        bytes32 courseHash = keccak256(abi.encodePacked(courseCode));
+        bytes32 disciplineHash = keccak256(abi.encodePacked(disciplineCode));
+
         require(
             !disciplineExistsInCourse[courseHash][disciplineHash],
             "Discipline already registered in this course!"
         );
+
         disciplinesByCourse[courseHash].push(
-            Discipline(
-                _disciplineCode,
-                _name,
-                _syllabus,
-                _workload,
-                _creditCount
-            )
+            Discipline(disciplineCode, name, syllabus, workload, creditCount)
         );
         disciplineExistsInCourse[courseHash][disciplineHash] = true;
-        emit DisciplineAdded(_courseCode, _disciplineCode);
+
+        emit DisciplineAdded(courseCode, disciplineCode);
     }
 
     function addStudent(
@@ -286,12 +303,7 @@ contract AcademicRegistry {
         address _institutionAddress,
         address _studentAddress,
         string calldata _courseCode,
-        string calldata _disciplineCode,
-        uint8 _semester,
-        uint16 _year,
-        uint8 _grade,
-        uint8 _attendance,
-        bool _status
+        Grade calldata _gradeInfo
     )
         public
         institutionExists(_institutionAddress)
@@ -303,7 +315,10 @@ contract AcademicRegistry {
             "Only the specified institution can add grades."
         );
         bytes32 courseHash = keccak256(abi.encodePacked(_courseCode));
-        bytes32 disciplineHash = keccak256(abi.encodePacked(_disciplineCode));
+        bytes32 disciplineHash = keccak256(
+            abi.encodePacked(_gradeInfo.disciplineCode)
+        );
+
         require(
             disciplineExistsInCourse[courseHash][disciplineHash],
             "Discipline not found in this course!"
@@ -317,61 +332,52 @@ contract AcademicRegistry {
                 !(keccak256(
                     abi.encodePacked(studentGrades[i].disciplineCode)
                 ) ==
-                    keccak256(abi.encodePacked(_disciplineCode)) &&
-                    studentGrades[i].semester == _semester &&
-                    studentGrades[i].year == _year),
+                    keccak256(abi.encodePacked(_gradeInfo.disciplineCode)) &&
+                    studentGrades[i].semester == _gradeInfo.semester &&
+                    studentGrades[i].year == _gradeInfo.year),
                 "Grade already recorded for this discipline, semester and year!"
             );
         }
         grades[_studentAddress].push(
             Grade(
-                _disciplineCode,
-                _semester,
-                _year,
-                _grade,
-                _attendance,
-                _status
+                _gradeInfo.disciplineCode,
+                _gradeInfo.semester,
+                _gradeInfo.year,
+                _gradeInfo.grade,
+                _gradeInfo.attendance,
+                _gradeInfo.status
             )
         );
-        emit GradeAdded(_studentAddress, _disciplineCode, _year, _semester);
+
+        emit GradeAdded(
+            _studentAddress,
+            _gradeInfo.disciplineCode,
+            _gradeInfo.year,
+            _gradeInfo.semester
+        );
     }
 
     function addBatchGrades(
         address _institutionAddress,
-        address[] calldata _studentAddresses,
-        string[] calldata _courseCodes,
-        string[] calldata _disciplineCodes,
-        uint8[] calldata _semesters,
-        uint16[] calldata _years,
-        uint8[] calldata _grades,
-        uint8[] calldata _attendances,
-        bool[] calldata _statuses
+        BatchGradePayload[] calldata _gradesInfo
     ) public institutionExists(_institutionAddress) onlyInstitution {
         require(
             msg.sender == _institutionAddress,
             "Only the specified institution can add grades in batch."
         );
-        uint256 len = _studentAddresses.length;
+
+        uint256 len = _gradesInfo.length;
+
         require(len > 0, "No grades to register in batch.");
-        require(
-            len == _courseCodes.length &&
-                len == _disciplineCodes.length &&
-                len == _semesters.length &&
-                len == _years.length &&
-                len == _grades.length &&
-                len == _attendances.length &&
-                len == _statuses.length,
-            "All input arrays must have the same length."
-        );
+
         for (uint256 i = 0; i < len; i++) {
-            address currentStudentAddress = _studentAddresses[i];
-            string memory currentCourseCode = _courseCodes[i];
-            string memory currentDisciplineCode = _disciplineCodes[i];
-            uint8 currentSemester = _semesters[i];
-            uint16 currentYear = _years[i];
-            uint8 currentGrade = _grades[i];
-            uint8 currentAttendance = _attendances[i];
-            bool currentStatus = _statuses[i];
+            BatchGradePayload memory info = _gradesInfo[i];
+
+            address currentStudentAddress = info.studentAddress;
+            string memory currentCourseCode = info.courseCode;
+            string memory currentDisciplineCode = info.disciplineCode;
+            uint8 currentSemester = info.semester;
+            uint16 currentYear = info.year;
 
             require(
                 students[currentStudentAddress].studentAddress != address(0),
@@ -407,9 +413,9 @@ contract AcademicRegistry {
                     currentDisciplineCode,
                     currentSemester,
                     currentYear,
-                    currentGrade,
-                    currentAttendance,
-                    currentStatus
+                    info.grade,
+                    info.attendance,
+                    info.status
                 )
             );
             emit GradeAdded(
