@@ -18,7 +18,7 @@ contract AcademicRecordStorage {
     );
     event StudentInformationAdded(address indexed studentAddress);
 
-    address private immutable contractOwner;
+    address public immutable contractOwner;
     address[] private institutionAddressList;
     mapping(address => bool) public isInstitution;
 
@@ -165,6 +165,10 @@ contract AcademicRecordStorage {
 
     constructor() {
         contractOwner = msg.sender;
+    }
+
+    function owner() public view returns (address) {
+        return contractOwner;
     }
 
     function addInstitution(
