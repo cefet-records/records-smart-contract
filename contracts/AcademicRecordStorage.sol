@@ -43,7 +43,7 @@ contract AcademicRecordStorage {
         int workload;
         int creditCount;
     }
-
+    
     struct Student {
         address studentAddress;
         string selfEncryptedInformation;
@@ -438,7 +438,6 @@ contract AcademicRecordStorage {
         public
         view
         studentExists(_studentAddress)
-        onlyStudent(_studentAddress)
         returns (string memory)
     {
         require(
@@ -465,10 +464,12 @@ contract AcademicRecordStorage {
     }
 
     function addStudentInformation(
+        string calldata _selfEncryptedInformation,
         string calldata _encryptedInformation,
         string calldata _publicKey,
         string calldata _publicHash
     ) public onlyStudent(msg.sender) studentExists(msg.sender) {
+        students[msg.sender].selfEncryptedInformation = _selfEncryptedInformation;
         students[msg.sender]
             .institutionEncryptedInformation = _encryptedInformation;
         students[msg.sender].publicKey = _publicKey;
@@ -476,23 +477,23 @@ contract AcademicRecordStorage {
         emit StudentInformationAdded(msg.sender);
     }
 
-    function confirmStudentInformation(
-        address _studentAddress,
-        address _institutionAddress,
-        string calldata _encryptedInformation
-    )
-        public
-        onlyInstitution
-        studentExists(_studentAddress)
-        studentIsInstitution(_studentAddress, _institutionAddress)
-    {
-        require(
-            msg.sender == _institutionAddress,
-            "Only the specified institution can confirm student information."
-        );
-        students[_studentAddress]
-            .selfEncryptedInformation = _encryptedInformation;
-    }
+    // function confirmStudentInformation(
+    //     address _studentAddress,
+    //     address _institutionAddress,
+    //     string calldata _encryptedInformation
+    // )
+    //     public
+    //     onlyInstitution
+    //     studentExists(_studentAddress)
+    //     studentIsInstitution(_studentAddress, _institutionAddress)
+    // {
+    //     require(
+    //         msg.sender == _institutionAddress,
+    //         "Only the specified institution can confirm student information."
+    //     );
+    //     students[_studentAddress]
+    //         .selfEncryptedInformation = _encryptedInformation;
+    // }
 
     function getPermission() public view returns (string memory) {
         if (msg.sender == contractOwner) {
