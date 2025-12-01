@@ -2,7 +2,12 @@
 pragma solidity ^0.8.28;
 
 contract AcademicRecordStorage {
-    event InstitutionAdded(address indexed institutionAddress, string name);
+    event InstitutionAdded(address indexed institutionAddress);
+    event InstitutionInformationAdded(
+        address indexed institutionAddress,
+        string name,
+        string document
+    );
     event CourseAdded(address indexed institutionAddress, string courseCode);
     event DisciplineAdded(string courseCode, string disciplineCode);
     event StudentAdded(address indexed studentAddress);
@@ -43,7 +48,7 @@ contract AcademicRecordStorage {
         int workload;
         int creditCount;
     }
-    
+
     struct Student {
         address studentAddress;
         string selfEncryptedInformation;
@@ -171,24 +176,42 @@ contract AcademicRecordStorage {
         return contractOwner;
     }
 
-    function addInstitution(
-        address _institutionAddress,
-        string calldata _name,
-        string calldata _document
-    ) public onlyOwner {
+    function addInstitution(address _institutionAddress) public onlyOwner {
         require(
             institutions[_institutionAddress].institutionAddress == address(0),
             "Institution already registered!"
         );
         institutions[_institutionAddress] = Institution(
             _institutionAddress,
-            _name,
-            _document,
+            "",
+            "",
             ""
         );
         institutionAddressList.push(_institutionAddress);
         isInstitution[_institutionAddress] = true;
-        emit InstitutionAdded(_institutionAddress, _name);
+        emit InstitutionAdded(_institutionAddress);
+    }
+
+    function addInstitutionInformation(
+        string calldata _name,
+        string calldata _document
+    ) public onlyInstitution {
+        require(
+            bytes(_name).length > 0,
+            "Institution document cannot be empty"
+        );
+        require(
+            bytes(_document).length > 0,
+            "Institution document cannot be empty"
+        );
+        Institution storage inst = institutions[msg.sender];
+        require(
+            inst.institutionAddress != address(0),
+            "Institution profile not found."
+        );
+        inst.name = _name;
+        inst.document = _document;
+        emit InstitutionInformationAdded(msg.sender, _name, _document);
     }
 
     function addInstitutionPublicKey(
@@ -434,12 +457,7 @@ contract AcademicRecordStorage {
     function retrieveRecipientEncrpytKey(
         address _allowedAddress,
         address _studentAddress
-    )
-        public
-        view
-        studentExists(_studentAddress)
-        returns (string memory)
-    {
+    ) public view studentExists(_studentAddress) returns (string memory) {
         require(
             bytes(recipientEncryptKey[_studentAddress][_allowedAddress])
                 .length != 0,
@@ -469,31 +487,14 @@ contract AcademicRecordStorage {
         string calldata _publicKey,
         string calldata _publicHash
     ) public onlyStudent(msg.sender) studentExists(msg.sender) {
-        students[msg.sender].selfEncryptedInformation = _selfEncryptedInformation;
+        students[msg.sender]
+            .selfEncryptedInformation = _selfEncryptedInformation;
         students[msg.sender]
             .institutionEncryptedInformation = _encryptedInformation;
         students[msg.sender].publicKey = _publicKey;
         students[msg.sender].publicHash = _publicHash;
         emit StudentInformationAdded(msg.sender);
     }
-
-    // function confirmStudentInformation(
-    //     address _studentAddress,
-    //     address _institutionAddress,
-    //     string calldata _encryptedInformation
-    // )
-    //     public
-    //     onlyInstitution
-    //     studentExists(_studentAddress)
-    //     studentIsInstitution(_studentAddress, _institutionAddress)
-    // {
-    //     require(
-    //         msg.sender == _institutionAddress,
-    //         "Only the specified institution can confirm student information."
-    //     );
-    //     students[_studentAddress]
-    //         .selfEncryptedInformation = _encryptedInformation;
-    // }
 
     function getPermission() public view returns (string memory) {
         if (msg.sender == contractOwner) {
