@@ -66,6 +66,36 @@ contract AcademicRecordStorage {
         bool status;
     }
 
+    
+    struct BatchStudentPayload {
+        address studentAddress;
+        address institutionAddress;
+    }
+
+    struct BatchCoursePayload {
+        string code;
+        string name;
+        string courseType;
+        int numberOfSemesters;
+    }
+
+    struct BatchDisciplinePayload {
+        string disciplineCode;
+        string name;
+        string syllabus;
+        int workload;
+        int creditCount;
+    }
+
+    struct FullDisciplinePayload {
+        string courseCode;
+        string disciplineCode;
+        string name;
+        string syllabus;
+        int workload;
+        int creditCount;
+    }
+
     struct BatchGradePayload {
         address studentAddress;
         string courseCode;
@@ -260,6 +290,37 @@ contract AcademicRecordStorage {
         emit CourseAdded(_institutionAddress, _code);
     }
 
+    function addBatchCourses(
+        address _institutionAddress,
+        BatchCoursePayload[] calldata _coursesInfo
+    ) public institutionExists(_institutionAddress) onlyInstitution {
+        require(
+            msg.sender == _institutionAddress,
+            "Only the specified institution can add courses in batch."
+        );
+
+        uint256 len = _coursesInfo.length;
+        require(len > 0, "No courses to register in batch.");
+
+        Course[] storage institutionCourses = courses[_institutionAddress];
+        
+        for (uint256 i = 0; i < len; i++) {
+            BatchCoursePayload memory info = _coursesInfo[i];
+            for (uint256 j = 0; j < institutionCourses.length; j++) {
+                require(
+                    keccak256(abi.encodePacked(institutionCourses[j].code)) !=
+                    keccak256(abi.encodePacked(info.code)),
+                    "Course already registered!"
+                );
+            }
+            
+            institutionCourses.push(
+                Course(info.code, info.name, info.courseType, info.numberOfSemesters)
+            );
+            emit CourseAdded(_institutionAddress, info.code);
+        }
+    }
+
     function addDisciplineToCourse(
         address institutionAddress,
         string calldata courseCode,
@@ -303,6 +364,62 @@ contract AcademicRecordStorage {
         emit DisciplineAdded(courseCode, disciplineCode);
     }
 
+    function addGlobalBatchDisciplines(
+        address _institutionAddress,
+        FullDisciplinePayload[] calldata _fullDisciplinesInfo
+    ) public institutionExists(_institutionAddress) onlyInstitution {
+        require(
+            msg.sender == _institutionAddress,
+            "Only the specified institution can add disciplines in batch."
+        );
+        uint256 len = _fullDisciplinesInfo.length;
+        require(len > 0, "No disciplines to register in batch.");
+        for (uint256 i = 0; i < len; i++) {
+            FullDisciplinePayload memory info = _fullDisciplinesInfo[i];
+            bool courseFound = false;
+            Course[] storage institutionCourses = courses[_institutionAddress];
+            for (uint256 k = 0; k < institutionCourses.length; k++) {
+                if (
+                    keccak256(abi.encodePacked(institutionCourses[k].code)) ==
+                    keccak256(abi.encodePacked(info.courseCode))
+                ) {
+                    courseFound = true;
+                    break;
+                }
+            }
+            require(courseFound, "Course not found for this discipline batch item!");
+            bytes32 courseHash = keccak256(abi.encodePacked(info.courseCode));
+            bytes32 disciplineHash = keccak256(abi.encodePacked(info.disciplineCode));
+            require(
+                !disciplineExistsInCourse[courseHash][disciplineHash],
+                "Discipline already registered in this course!"
+            );
+            Discipline[] storage courseDisciplines = disciplinesByCourse[courseHash];
+            courseDisciplines.push(
+                Discipline(info.disciplineCode, info.name, info.syllabus, info.workload, info.creditCount)
+            );
+            disciplineExistsInCourse[courseHash][disciplineHash] = true;
+            emit DisciplineAdded(info.courseCode, info.disciplineCode);
+        }
+    }
+
+    function getInstitutionCourses(
+        address _institutionAddress
+    ) public view returns (Course[] memory) {
+        require(
+            isInstitution[_institutionAddress],
+            "Institution not registered!"
+        );
+        return courses[_institutionAddress];
+    }
+
+    function getDisciplinesByCourseCode(
+        string memory _courseCode
+    ) public view returns (Discipline[] memory) {
+        bytes32 courseHash = keccak256(abi.encodePacked(_courseCode));
+        return disciplinesByCourse[courseHash];
+    }
+
     function addStudent(
         address _institutionAddress,
         address _studentAddress
@@ -318,6 +435,31 @@ contract AcademicRecordStorage {
         students[_studentAddress] = Student(_studentAddress, "", "", "", "");
         studentToInstitution[_studentAddress] = _institutionAddress;
         emit StudentAdded(_studentAddress);
+    }
+
+    function addBatchStudents(BatchStudentPayload[] calldata _studentsInfo) public onlyInstitution {
+        uint256 len = _studentsInfo.length;
+        require(len > 0, "No students to register in batch.");
+        for (uint256 i = 0; i < len; i++) {
+            BatchStudentPayload memory info = _studentsInfo[i];
+            address currentStudentAddress = info.studentAddress;
+            address currentInstitutionAddress = info.institutionAddress;
+            require(
+                msg.sender == currentInstitutionAddress,
+                "Batch enrollment requires caller to be the specified institution."
+            );
+            require(
+                institutions[currentInstitutionAddress].institutionAddress != address(0),
+                "Institution is not registered!"
+            );
+            require(
+                students[currentStudentAddress].studentAddress == address(0),
+                "Student already registered!"
+            );
+            students[currentStudentAddress] = Student(currentStudentAddress, "", "", "", "");
+            studentToInstitution[currentStudentAddress] = currentInstitutionAddress;
+            emit StudentAdded(currentStudentAddress);
+        }
     }
 
     function getStudent(
